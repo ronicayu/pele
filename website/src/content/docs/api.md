@@ -221,7 +221,7 @@ mount(container, source, { zoom: false });
 | Input | Action |
 | --- | --- |
 | Pinch, or `Ctrl`/`⌘` + wheel | Zoom at the pointer |
-| Drag | Pan a zoomed diagram |
+| Drag | Pan a zoomed diagram, or with `drag`, move one at rest within its container |
 | Double-click | Zoom in, or reset |
 | `+` `-` `0` and arrow keys | Zoom, reset, and pan when the diagram has focus |
 
@@ -246,6 +246,7 @@ const zoom = enableZoom(container);
 | `maxScale` | `number` | Largest scale, where `1` is the diagram's natural size. Defaults to `3`. |
 | `controls` | `boolean` | Shows the zoom buttons. Defaults to `true`. |
 | `labels` | `{ zoomIn?, zoomOut?, reset? }` | Accessible names of the buttons. Defaults to English. |
+| `drag` | `boolean` | Lets a zoomable diagram be dragged within its container's spare room before it is zoomed. Its text can then not be selected. Defaults to `false`. |
 
 | Member | Description |
 | --- | --- |
