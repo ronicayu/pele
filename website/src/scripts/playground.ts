@@ -42,7 +42,8 @@ const inputPanel = document.getElementById('input-panel')!;
 const outputPanel = document.getElementById('output-panel')!;
 const preview = document.getElementById('playground-preview')!;
 const peleOutput = document.getElementById('pele-output')!;
-const zoom = enableZoom(peleOutput);
+// Every diagram can be enlarged and dragged about the panel, even one that already fits it.
+const zoom = enableZoom(peleOutput, { always: true, drag: true });
 const mermaidOutput = document.getElementById('mermaid-output')!;
 const peleTime = document.getElementById('pele-time')!;
 const mermaidTime = document.getElementById('mermaid-time')!;

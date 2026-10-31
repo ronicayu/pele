@@ -265,4 +265,55 @@ describe('zoom', () => {
     tap(shrunk, link);
     expect(click(shrunk, link).defaultPrevented).toBe(false);
   });
+
+  it('drags a drawing at rest about the room its element has to spare, where asked to', () => {
+    // A panel three times as tall as the drawing shown in it.
+    const roomy = (options: { drag?: boolean }) => {
+      const drawing = drawingIn(400);
+      Object.assign(drawing.element, { clientHeight: 300 });
+      const zoom = enableZoom(drawing.element, { controls: false, ...options });
+      const drag = (pointerType: string, by: number) => {
+        drawing.fire('pointerdown', { pointerId: 1, pointerType, button: 0, clientX: 100, clientY: 50 });
+        drawing.fire('pointermove', { pointerId: 1, pointerType, clientX: 100, clientY: 52 });
+        drawing.fire('pointermove', { pointerId: 1, pointerType, clientX: 100, clientY: 52 + by });
+        drawing.fire('pointerup', { pointerId: 1 });
+      };
+      const viewBox = () => drawing.svg.getAttribute('viewBox');
+      return { drawing, zoom, drag, viewBox, style: drawing.svg.style as { cursor?: string; userSelect?: string } };
+    };
+
+    const fixed = roomy({});
+    fixed.drag('mouse', 30);
+    expect(fixed.viewBox()).toBe('0 0 1200 300');
+    expect(fixed.style.cursor).toBe('');
+
+    const loose = roomy({ drag: true });
+    expect([loose.style.cursor, loose.style.userSelect]).toEqual(['grab', 'none']);
+    // One finger is left to scroll the page.
+    loose.drag('touch', 30);
+    expect(loose.viewBox()).toBe('0 0 1200 300');
+    // The drawing moves down the panel, at the scale that fits, and stops at its edge.
+    loose.drag('mouse', 30);
+    expect(loose.zoom.scale).toBe(loose.zoom.fit);
+    expect(loose.viewBox()).toBe('0 -90 1200 900');
+    expect(click(loose.drawing, {}).defaultPrevented).toBe(true);
+    loose.drag('mouse', 1000);
+    expect(loose.viewBox()).toBe('0 -600 1200 900');
+    loose.drawing.fire('keydown', { key: 'Escape', preventDefault: () => {} });
+    expect(loose.viewBox()).toBe('0 0 1200 300');
+    loose.drawing.fire('keydown', { key: 'ArrowUp', preventDefault: () => {} });
+    expect(loose.viewBox()).toBe('0 -144 1200 900');
+  });
+
+  it('keeps the padding around a drawing that overflows its element when it is moved', () => {
+    globals.getComputedStyle = () => ({ position: 'relative', getPropertyValue: () => '24px' });
+    // As tall as the element's content, so taller than the room inside its padding.
+    const drawing = drawingIn(400);
+    Object.assign(drawing.element, { clientWidth: 448 });
+    enableZoom(drawing.element, { controls: false, drag: true });
+    drawing.fire('pointerdown', { pointerId: 1, pointerType: 'mouse', button: 0, clientX: 100, clientY: 50 });
+    drawing.fire('pointermove', { pointerId: 1, pointerType: 'mouse', clientX: 100, clientY: 80 });
+    drawing.fire('pointerup', { pointerId: 1 });
+    expect(drawing.svg.getAttribute('viewBox')).toBe('0 -90 1344 444');
+  });
 });

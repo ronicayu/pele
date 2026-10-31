@@ -11,6 +11,9 @@ export interface ZoomOptions {
   controls?: boolean;
   // What the buttons are called, for a page that is not in English.
   labels?: { zoomIn?: string; zoomOut?: string; reset?: string };
+  // Whether a drawing at rest can be dragged about the room its element has to spare, and not
+  // only once enlarged. It cannot by default, which leaves its text to be selected.
+  drag?: boolean;
 }
 
 export interface Zoom {
@@ -100,20 +103,25 @@ export function zoomWith(element: HTMLElement, options: ZoomOptions, observe: bo
   const fit = (): number => (natural.width > 0 && rest.width > 0 ? rest.width / natural.width : 1);
   const most = (): number => Math.max(fit(), options.maxScale ?? 3);
   const zoomable = (): boolean => svg !== null && natural.width > 0 && (options.always === true || fit() < 0.999);
+  const loose = (): boolean => options.drag === true && roomy && zoomable();
 
   const measure = (): void => {
     if (!svg || scale !== 0) return;
     const at = svg.getBoundingClientRect();
     rest = { width: at.width, height: at.height };
-    box = { width: Math.max(rest.width, element.clientWidth), height: Math.max(rest.height, element.clientHeight) };
+    const style = view().getComputedStyle(element);
+    const pad = (side: string): number => parseFloat(style.getPropertyValue(`padding-${side}`)) || 0;
+    // A drawing that overflows its element keeps its padding as well, so that it neither jumps
+    // nor changes how far the element scrolls.
+    box = {
+      width: Math.max(rest.width + pad('left') + pad('right'), element.clientWidth),
+      height: Math.max(rest.height + pad('top') + pad('bottom'), element.clientHeight),
+    };
     roomy = box.width > rest.width + 1 || box.height > rest.height + 1;
     if (!roomy) box = rest;
     // Padding keeps a drawing at rest off the element's edges. An enlarged one is a view, which
     // reaches them: margins of the opposite size carry it over the padding.
-    const style = view().getComputedStyle(element);
-    bleed = ['Top', 'Right', 'Bottom', 'Left']
-      .map((side) => `${-(parseFloat(style.getPropertyValue(`padding-${side.toLowerCase()}`)) || 0)}px`)
-      .join(' ');
+    bleed = ['top', 'right', 'bottom', 'left'].map((side) => `${-pad(side)}px`).join(' ');
   };
 
   let bar: HTMLElement | undefined;
@@ -179,9 +187,9 @@ export function zoomWith(element: HTMLElement, options: ZoomOptions, observe: bo
     restore();
     scale = 0;
     svg.setAttribute('viewBox', `0 0 ${natural.width} ${natural.height}`);
-    svg.style.cursor = '';
-    svg.style.userSelect = '';
     measure();
+    svg.style.cursor = loose() ? 'grab' : '';
+    svg.style.userSelect = loose() ? 'none' : '';
     // One finger still scrolls the page. Two are left to the drawing.
     svg.style.touchAction = zoomable() ? 'pan-y' : '';
     if (zoomable()) svg.setAttribute('tabindex', '0');
@@ -223,14 +231,15 @@ export function zoomWith(element: HTMLElement, options: ZoomOptions, observe: bo
     cleared = null;
   };
 
-  // Shows the drawing at a scale, keeping the point under (clientX, clientY) where it is.
-  const show = (next: number, clientX?: number, clientY?: number): void => {
+  // Shows the drawing at a scale, keeping the point under (clientX, clientY) where it is. Held,
+  // a drawing at the scale that fits is shown as a view, which can be moved, and does not rest.
+  const show = (next: number, clientX?: number, clientY?: number, held = false): void => {
     if (!svg) return;
     if (scale === 0) measure();
     if (!zoomable()) return;
     const from = scale || fit();
     const to = Math.min(Math.max(next, fit()), most());
-    if (to <= fit() * 1.001) {
+    if (to <= fit() * 1.001 && !held) {
       settle();
       return;
     }
@@ -268,6 +277,12 @@ export function zoomWith(element: HTMLElement, options: ZoomOptions, observe: bo
 
   const move = (dx: number, dy: number): void => {
     if (scale !== 0) place(x - dx / scale, y - dy / scale);
+  };
+
+  // Lets a drawing at rest be moved, where the drag option allows it.
+  const lift = (): boolean => {
+    if (scale === 0 && loose()) show(fit(), undefined, undefined, true);
+    return scale !== 0;
   };
 
   const resized = (): void => {
@@ -345,8 +360,13 @@ export function zoomWith(element: HTMLElement, options: ZoomOptions, observe: bo
       return;
     }
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-    if (scale === 0) return;
     travelled += Math.abs(event.clientX - last.x) + Math.abs(event.clientY - last.y);
+    if (scale === 0) {
+      // One finger at rest scrolls the page. Capturing only now leaves a press on a link a click.
+      if (travelled <= 4 || event.pointerType === 'touch' || !lift()) return;
+      element.setPointerCapture?.(event.pointerId);
+      if (svg) svg.style.cursor = 'grabbing';
+    }
     if (travelled > 4) dragged = true;
     move(event.clientX - last.x, event.clientY - last.y);
   };
@@ -387,7 +407,7 @@ export function zoomWith(element: HTMLElement, options: ZoomOptions, observe: bo
     const key = event.key;
     if (key === '+' || key === '=') show((scale || fit()) * STEP);
     else if (key === '-') show((scale || fit()) / STEP);
-    else if (scale === 0) return;
+    else if (scale === 0 && !(key.startsWith('Arrow') && lift())) return;
     else if (key === '0' || key === 'Escape') settle();
     else if (key === 'ArrowLeft') move(PAN, 0);
     else if (key === 'ArrowRight') move(-PAN, 0);
