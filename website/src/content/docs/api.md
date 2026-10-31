@@ -246,7 +246,7 @@ const zoom = enableZoom(container);
 | `maxScale` | `number` | Largest scale, where `1` is the diagram's natural size. Defaults to `3`. |
 | `controls` | `boolean` | Shows the zoom buttons. Defaults to `true`. |
 | `labels` | `{ zoomIn?, zoomOut?, reset? }` | Accessible names of the buttons. Defaults to English. |
-| `drag` | `boolean` | Lets a zoomable diagram be dragged within its container's spare room before it is zoomed. Its text can then not be selected. Defaults to `false`. |
+| `drag` | `boolean` | Lets a zoomable diagram be [dragged](#draggable-diagrams) within its container's spare room before it is zoomed. Its text can then not be selected. Defaults to `false`. |
 
 | Member | Description |
 | --- | --- |
@@ -259,6 +259,24 @@ const zoom = enableZoom(container);
 | `destroy()` | Removes the behavior and resets the diagram. |
 
 The buttons use the diagram's color variables. Position them with `--pele-zoom-top`, `--pele-zoom-right`, `--pele-zoom-bottom`, and `--pele-zoom-left`. `--pele-zoom-cursor` sets their cursor and defaults to `pointer`.
+
+#### Draggable diagrams
+
+Pass `drag` to let readers move a diagram without zooming in first. It moves within the container's spare room, so give the container a fixed height:
+
+```css
+pre.mermaid { height: 480px; }
+```
+
+```ts
+import { mount } from 'pele';
+
+for (const el of document.querySelectorAll('pre.mermaid')) {
+  mount(el, el.textContent, { zoom: { always: true, drag: true } });
+}
+```
+
+This works in Markdown that your site turns into HTML: select the element your Markdown renderer outputs for `mermaid` code blocks. Hosts that don't run your scripts, such as GitHub, draw Mermaid themselves.
 
 ## parse
 
